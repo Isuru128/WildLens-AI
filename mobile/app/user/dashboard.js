@@ -1,261 +1,885 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, View, Text, ScrollView, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
+import { useState } from 'react';
+import {
+    View,
+    Text,
+    ScrollView,
+    TouchableOpacity,
+    StyleSheet,
+    FlatList,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import API, { API_URL } from '../../src/services/api';
+import { Ionicons } from '@expo/vector-icons';
+
+const COLORS = {
+    primary: '#0F766E',
+    secondary: '#14B8A6',
+    accent: '#22C55E',
+    background: '#F8FAFC',
+    card: '#FFFFFF',
+    text: '#0F172A',
+    muted: '#64748B',
+};
+
+const recentIdentifications = [
+    {
+        id: '1',
+        image:
+            'https://images.unsplash.com/photo-1552728089-57bdde30beb3?w=800',
+        commonName: 'Sri Lankan Junglefowl',
+        scientificName: 'Gallus lafayettii',
+        confidence: 96,
+    },
+    {
+        id: '2',
+        image:
+            'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=800',
+        commonName: 'Ceylon Cinnamon',
+        scientificName: 'Cinnamomum verum',
+        confidence: 93,
+    },
+    {
+        id: '3',
+        image:
+            'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=800',
+        commonName: 'Asian Elephant',
+        scientificName: 'Elephas maximus',
+        confidence: 98,
+    },
+];
 
 export default function UserDashboard() {
     const router = useRouter();
-    const [featuredProducts, setFeaturedProducts] = useState([]);
-    const [featuredLoading, setFeaturedLoading] = useState(true);
-    const [featuredError, setFeaturedError] = useState('');
-    const [upcomingAppointment, setUpcomingAppointment] = useState(null);
-
-    const loadFeaturedProducts = useCallback(async () => {
-        try {
-            setFeaturedLoading(true);
-            setFeaturedError('');
-
-            const res = await API.get('/products/featured');
-            setFeaturedProducts(res.data);
-        } catch (error) {
-            setFeaturedError(error.response?.data?.msg || 'Failed to load featured products');
-        } finally {
-            setFeaturedLoading(false);
-        }
-    }, []);
-
-    const loadUpcomingAppointment = useCallback(async () => {
-        try {
-            const res = await API.get('/appointments/my-appointments');
-            const nextAppointment = (res.data || []).find((appointment) =>
-                !['Completed', 'Cancelled'].includes(appointment.status)
-            );
-
-            setUpcomingAppointment(nextAppointment || null);
-        } catch (_error) {
-            setUpcomingAppointment(null);
-        }
-    }, []);
-
-    useFocusEffect(
-        useCallback(() => {
-            loadFeaturedProducts();
-            loadUpcomingAppointment();
-        }, [loadFeaturedProducts, loadUpcomingAppointment])
-    );
+    const [recentData] = useState(recentIdentifications);
 
     return (
         <View style={styles.container}>
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+            <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={styles.content}
+                showsVerticalScrollIndicator={false}
+            >
+
+                {/* =========================
+                    HEADER
+                ========================= */}
                 <View style={styles.header}>
                     <View>
-                        <Text style={styles.greeting}>Welcome</Text>
-                        <Text style={styles.title}>Pets Paradise</Text>
+                        <Text style={styles.greeting}>
+                            Welcome back 👋
+                        </Text>
+
+                        <Text style={styles.title}>
+                            WildLens
+                        </Text>
                     </View>
-                    <View style={styles.headerActions}>
-                        <TouchableOpacity style={styles.avatar} onPress={() => router.push('/profile')}>
-                            <MaterialIcons name="person" size={28} color="#fff" />
+
+                    <TouchableOpacity
+                        style={styles.avatar}
+                        onPress={() => router.push('/profile')}
+                    >
+                        <Ionicons
+                            name="person-outline"
+                            size={23}
+                            color={COLORS.card}
+                        />
+                    </TouchableOpacity>
+                </View>
+
+                {/* =========================
+                    HERO
+                ========================= */}
+                <View style={styles.hero}>
+                    <View style={styles.heroIcon}>
+                        <Ionicons
+                            name="scan-outline"
+                            size={30}
+                            color={COLORS.card}
+                        />
+                    </View>
+
+                    <Text style={styles.heroTitle}>
+                        AI Powered Image Identifier
+                    </Text>
+
+                    <Text style={styles.heroSubtitle}>
+                        Discover the wildlife around you
+                    </Text>
+
+                    <Text style={styles.heroText}>
+                        Capture or upload an image and let AI instantly
+                        identify plants, animals, insects, birds,
+                        landmarks and more.
+                    </Text>
+
+                    <View style={styles.heroButtons}>
+                        <TouchableOpacity
+                            style={styles.primaryBtn}
+                            onPress={() => router.push('/camera')}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons
+                                name="camera"
+                                size={21}
+                                color={COLORS.card}
+                            />
+
+                            <Text style={styles.primaryBtnText}>
+                                Capture
+                            </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.avatar} onPress={() => router.push('/user/cart')}>
-                            <Ionicons name="cart-outline" size={28} color="#fff" />
+
+                        <TouchableOpacity
+                            style={styles.secondaryBtn}
+                            onPress={() => router.push('/upload')}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons
+                                name="cloud-upload-outline"
+                                size={21}
+                                color={COLORS.primary}
+                            />
+
+                            <Text style={styles.secondaryBtnText}>
+                                Upload
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                <View style={styles.banner}>
-                    <Text style={styles.bannerTitle}>Everything your pet needs</Text>
-                    <Text style={styles.bannerText}>Shop products, book appointments, and manage pet records.</Text>
-                    <TouchableOpacity style={styles.bannerButton} onPress={() => router.push('/user/shop')}>
-                        <Text style={styles.bannerButtonText}>Shop Now</Text>
-                    </TouchableOpacity>
+                {/* =========================
+                    QUICK ACTIONS
+                ========================= */}
+                <View style={styles.grid}>
+                    <Action
+                        title="Capture"
+                        subtitle="Take a photo"
+                        icon="camera-outline"
+                        onPress={() => router.push('/camera')}
+                    />
+
+                    <Action
+                        title="Upload"
+                        subtitle="Choose an image"
+                        icon="cloud-upload-outline"
+                        onPress={() => router.push('/upload')}
+                    />
+
+                    <Action
+                        title="History"
+                        subtitle="Previous scans"
+                        icon="time-outline"
+                        onPress={() => router.push('/history')}
+                    />
+
+                    <Action
+                        title="Explore"
+                        subtitle="Discover wildlife"
+                        icon="compass-outline"
+                        onPress={() => router.push('/explore')}
+                    />
                 </View>
+
+                {/* =========================
+                    RECENT IDENTIFICATIONS
+                ========================= */}
+                <Section
+                    title="Recent Identifications"
+                    action="View All"
+                    onPress={() => router.push('/history')}
+                />
+
+                <FlatList
+                    horizontal
+                    data={recentData}
+                    keyExtractor={(item) => item.id}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.horizontalList}
+                    renderItem={({ item }) => (
+                        <TouchableOpacity
+                            style={styles.identifyCard}
+                            activeOpacity={0.85}
+                        >
+                            <Image
+                                source={{ uri: item.image }}
+                                style={styles.identifyImage}
+                                contentFit="cover"
+                            />
+
+                            <Text
+                                style={styles.identifyName}
+                                numberOfLines={1}
+                            >
+                                {item.commonName}
+                            </Text>
+
+                            <Text
+                                style={styles.identifyScientific}
+                                numberOfLines={1}
+                            >
+                                {item.scientificName}
+                            </Text>
+
+                            <View style={styles.confidenceBadge}>
+                                <Ionicons
+                                    name="checkmark-circle"
+                                    size={13}
+                                    color="#15803D"
+                                />
+
+                                <Text style={styles.confidenceText}>
+                                    {item.confidence}% Match
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    )}
+                />
+
+                {/* =========================
+                    AI INSIGHTS
+                ========================= */}
+                <Section title="AI Insights" />
+
+                <View style={styles.statsContainer}>
+                    <StatCard
+                        number="482"
+                        label="Identified"
+                        icon="scan-outline"
+                    />
+
+                    <StatCard
+                        number="91%"
+                        label="Accuracy"
+                        icon="analytics-outline"
+                    />
+
+                    <StatCard
+                        number="78"
+                        label="Species"
+                        icon="leaf-outline"
+                    />
+                </View>
+
+                {/* =========================
+                    SPECIES INFORMATION
+                ========================= */}
+                <View style={styles.infoCard}>
+                    <View style={styles.infoHeader}>
+                        <View style={styles.infoIcon}>
+                            <Ionicons
+                                name="leaf"
+                                size={20}
+                                color={COLORS.primary}
+                            />
+                        </View>
+
+                        <View style={styles.infoHeaderText}>
+                            <Text style={styles.objectName}>
+                                Sri Lankan Junglefowl
+                            </Text>
+
+                            <Text style={styles.scientificName}>
+                                Gallus lafayettii
+                            </Text>
+                        </View>
+                    </View>
+
+                    <Text style={styles.infoText}>
+                        Endemic bird species found only in Sri Lanka.
+                        Commonly inhabits forests and isolated woodland
+                        areas.
+                    </Text>
+
+                    <View style={styles.bioGrid}>
+                        <BioItem
+                            label="Habitat"
+                            value="Forest"
+                        />
+
+                        <BioItem
+                            label="Status"
+                            value="Least Concern"
+                        />
+
+                        <BioItem
+                            label="Family"
+                            value="Phasianidae"
+                        />
+
+                        <BioItem
+                            label="Kingdom"
+                            value="Animalia"
+                        />
+                    </View>
+                </View>
+
+                {/* =========================
+                    TOURIST TOOLS
+                ========================= */}
+                <Section title="Tourist Tools" />
 
                 <View style={styles.grid}>
-                    <Action title="Shop" icon="bag-outline" onPress={() => router.push('/user/shop')} />
-                    <Action title="Orders" icon="receipt-outline" onPress={() => router.push('/user/orders')} />
-                    <Action title="Appointments" icon="calendar-outline" onPress={() => router.push('/user/appointments')} />
-                    <Action title="My Pets" icon="paw-outline" onPress={() => router.push('/user/pets')} />
-                </View>
-
-                <Section title="Featured Products" action="See More" onPress={() => router.push('/user/shop')} />
-
-                {featuredLoading ? (
-                    <View style={styles.featuredLoading}>
-                        <ActivityIndicator color="#2563eb" />
-                    </View>
-                ) : featuredError ? (
-                    <TouchableOpacity style={styles.featuredNotice} onPress={loadFeaturedProducts}>
-                        <Text style={styles.featuredNoticeText}>{featuredError}. Tap to retry.</Text>
-                    </TouchableOpacity>
-                ) : featuredProducts.length === 0 ? (
-                    <View style={styles.featuredNotice}>
-                        <Text style={styles.featuredNoticeText}>No featured products yet</Text>
-                    </View>
-                ) : (
-                    <FlatList
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        data={featuredProducts}
-                        keyExtractor={(item) => item._id || item.id}
-                        renderItem={({ item }) => (
-                            <FeaturedProductCard product={item} onPress={() => router.push('/user/shop')} />
-                        )}
+                    <Action
+                        title="Nearby Species"
+                        subtitle="Find wildlife nearby"
+                        icon="location-outline"
+                        onPress={() => router.push('/nearby')}
                     />
-                )}
 
-                <Section title="Upcoming Appointment" action="Book" onPress={() => router.push('/user/appointments')} />
-                <View style={styles.infoCard}>
-                    <Text style={styles.infoTitle}>{upcomingAppointment?.reason || 'No appointment booked'}</Text>
-                    <Text style={styles.infoText}>
-                        {upcomingAppointment ? `${upcomingAppointment.petName} | ${upcomingAppointment.date} | ${formatTimeLabel(upcomingAppointment.time)}` : 'Book a clinic visit for your pet'}
-                    </Text>
+                    <Action
+                        title="Field Guide"
+                        subtitle="Learn about species"
+                        icon="book-outline"
+                        onPress={() => router.push('/guide')}
+                    />
+
+                    <Action
+                        title="Biodiversity Map"
+                        subtitle="Explore locations"
+                        icon="map-outline"
+                        onPress={() => router.push('/map')}
+                    />
+
+                    <Action
+                        title="Offline Guide"
+                        subtitle="Use without internet"
+                        icon="download-outline"
+                        onPress={() => router.push('/offline')}
+                    />
                 </View>
 
-                <Section title="Pet Records" action="Manage" onPress={() => router.push('/user/pets')} />
-                <View style={styles.infoCard}>
-                    <Text style={styles.infoTitle}>Rocky</Text>
-                    <Text style={styles.infoText}>Dog • 2 years • Healthy</Text>
-                </View>
             </ScrollView>
         </View>
     );
 }
 
-function Action({ title, icon, onPress }) {
+/* =====================================================
+   ACTION CARD
+===================================================== */
+
+function Action({
+    title,
+    subtitle,
+    icon,
+    onPress,
+}) {
     return (
-        <TouchableOpacity style={styles.actionCard} onPress={onPress}>
-            <Ionicons name={icon} size={28} color="#2563eb" style={styles.actionIcon} />
-            <Text style={styles.actionText}>{title}</Text>
+        <TouchableOpacity
+            style={styles.actionCard}
+            onPress={onPress}
+            activeOpacity={0.8}
+        >
+            <View style={styles.actionIconContainer}>
+                <Ionicons
+                    name={icon}
+                    size={24}
+                    color={COLORS.primary}
+                />
+            </View>
+
+            <Text style={styles.actionText}>
+                {title}
+            </Text>
+
+            <Text style={styles.actionSubtitle}>
+                {subtitle}
+            </Text>
         </TouchableOpacity>
     );
 }
 
-function Section({ title, action, onPress }) {
+/* =====================================================
+   SECTION HEADER
+===================================================== */
+
+function Section({
+    title,
+    action,
+    onPress,
+}) {
     return (
         <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{title}</Text>
-            <TouchableOpacity onPress={onPress}>
-                <Text style={styles.sectionAction}>{action}</Text>
-            </TouchableOpacity>
+            <Text style={styles.sectionTitle}>
+                {title}
+            </Text>
+
+            {action && (
+                <TouchableOpacity
+                    onPress={onPress}
+                    activeOpacity={0.7}
+                >
+                    <Text style={styles.sectionAction}>
+                        {action}
+                    </Text>
+                </TouchableOpacity>
+            )}
         </View>
     );
 }
 
-function FeaturedProductCard({ product, onPress }) {
+/* =====================================================
+   STAT CARD
+===================================================== */
+
+function StatCard({
+    number,
+    label,
+    icon,
+}) {
     return (
-        <TouchableOpacity style={styles.productCard} onPress={onPress}>
-            <ProductImage imageUrl={product.imageUrl} />
-            <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-            <Text style={styles.productCategory} numberOfLines={1}>{product.category}</Text>
-            <Text style={styles.productPrice}>Rs. {Number(product.price || 0).toLocaleString()}</Text>
-        </TouchableOpacity>
-    );
-}
-
-function ProductImage({ imageUrl }) {
-    const [hasError, setHasError] = useState(false);
-    const uri = normalizeImageUrl(imageUrl);
-
-    useEffect(() => {
-        setHasError(false);
-    }, [uri]);
-
-    if (!uri || hasError) {
-        return (
-            <View style={styles.productImagePlaceholder}>
-                <Ionicons name="image-outline" size={28} color="#6b7280" />
+        <View style={styles.statCard}>
+            <View style={styles.statIcon}>
+                <Ionicons
+                    name={icon}
+                    size={18}
+                    color={COLORS.primary}
+                />
             </View>
-        );
-    }
 
-    return (
-        <Image
-            source={{ uri, headers: { Accept: 'image/*,*/*' } }}
-            style={styles.productImage}
-            contentFit="cover"
-            onError={() => setHasError(true)}
-        />
+            <Text style={styles.statNumber}>
+                {number}
+            </Text>
+
+            <Text style={styles.statLabel}>
+                {label}
+            </Text>
+        </View>
     );
 }
 
-function normalizeImageUrl(value) {
-    let imageUrl = String(value || '').trim();
+/* =====================================================
+   BIO ITEM
+===================================================== */
 
-    if (!imageUrl) {
-        return '';
-    }
+function BioItem({
+    label,
+    value,
+}) {
+    return (
+        <View style={styles.bioItem}>
+            <Text style={styles.bioLabel}>
+                {label}
+            </Text>
 
-    if (imageUrl.startsWith('www.')) {
-        imageUrl = `https://${imageUrl}`;
-    }
-
-    if (imageUrl.startsWith('data:image/')) {
-        return encodeURI(imageUrl);
-    }
-
-    if (/^https?:\/\//i.test(imageUrl)) {
-        return `${API_URL}/images/product?url=${encodeURIComponent(imageUrl)}`;
-    }
-
-    return '';
+            <Text style={styles.bioValue}>
+                {value}
+            </Text>
+        </View>
+    );
 }
 
-function formatTimeLabel(value) {
-    if (!value) {
-        return '';
-    }
-
-    const [hourText, minuteText] = value.split(':');
-    const hour = Number(hourText);
-    const minute = Number(minuteText);
-    const suffix = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-
-    return `${displayHour}.${String(minute).padStart(2, '0')} ${suffix}`;
-}
+/* =====================================================
+   STYLES
+===================================================== */
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f5f7fb' },
-    scroll: { flex: 1 },
-    content: { padding: 18, paddingBottom: 40 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
-    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    greeting: { color: '#6b7280' },
-    title: { fontSize: 28, fontWeight: '900', color: '#111827' },
-    avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center' },
-    banner: { backgroundColor: '#2563eb', padding: 22, borderRadius: 24, marginBottom: 20 },
-    bannerTitle: { color: '#fff', fontSize: 24, fontWeight: '900', marginBottom: 8 },
-    bannerText: { color: '#dbeafe', marginBottom: 16 },
-    bannerButton: { backgroundColor: '#fff', padding: 12, borderRadius: 14, alignSelf: 'flex-start' },
-    bannerButtonText: { color: '#2563eb', fontWeight: '900' },
-    grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-    actionCard: { width: '48%', backgroundColor: '#fff', padding: 18, borderRadius: 18, marginBottom: 14 },
-    actionIcon: { marginBottom: 8 },
-    actionText: { fontWeight: '800', fontSize: 16 },
-    section: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 14, alignItems: 'center' },
-    sectionTitle: { fontSize: 21, fontWeight: '900' },
-    sectionAction: { color: '#2563eb', fontWeight: '800' },
-    featuredLoading: { height: 198, alignItems: 'center', justifyContent: 'center' },
-    featuredNotice: { backgroundColor: '#fff', padding: 16, borderRadius: 18 },
-    featuredNoticeText: { color: '#6b7280', fontWeight: '800' },
-    productCard: { width: 170, backgroundColor: '#fff', padding: 12, borderRadius: 18, marginRight: 14 },
-    productImage: { width: '100%', aspectRatio: 1, borderRadius: 14, marginBottom: 10, backgroundColor: '#e5e7eb' },
-    productImagePlaceholder: {
-        width: '100%',
-        aspectRatio: 1,
-        borderRadius: 14,
-        marginBottom: 10,
-        backgroundColor: '#e5e7eb',
-        alignItems: 'center',
-        justifyContent: 'center'
+    container: {
+        flex: 1,
+        backgroundColor: COLORS.background,
     },
-    productName: { fontWeight: '900', color: '#111827', minHeight: 38 },
-    productCategory: { color: '#6b7280', marginTop: 4 },
-    productPrice: { color: '#2563eb', fontWeight: '900', marginTop: 8 },
-    infoCard: { backgroundColor: '#fff', padding: 16, borderRadius: 18, marginBottom: 10 },
-    infoTitle: { fontWeight: '900', fontSize: 17 },
-    infoText: { color: '#6b7280', marginTop: 4 }
+
+    scroll: {
+        flex: 1,
+    },
+
+    content: {
+        padding: 18,
+        paddingBottom: 40,
+    },
+
+    /* =========================
+       HEADER
+    ========================= */
+
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+
+    greeting: {
+        color: COLORS.muted,
+        fontSize: 13,
+        fontWeight: '600',
+        marginBottom: 3,
+    },
+
+    title: {
+        fontSize: 28,
+        fontWeight: '900',
+        color: COLORS.text,
+    },
+
+    avatar: {
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        backgroundColor: COLORS.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 4,
+        shadowColor: COLORS.primary,
+        shadowOpacity: 0.2,
+        shadowRadius: 7,
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+    },
+
+    /* =========================
+       HERO
+    ========================= */
+
+    hero: {
+        backgroundColor: COLORS.primary,
+        padding: 22,
+        borderRadius: 24,
+        marginBottom: 20,
+        overflow: 'hidden',
+        elevation: 5,
+        shadowColor: COLORS.primary,
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        shadowOffset: {
+            width: 0,
+            height: 6,
+        },
+    },
+
+    heroIcon: {
+        width: 52,
+        height: 52,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14,
+    },
+
+    heroTitle: {
+        color: COLORS.card,
+        fontSize: 24,
+        fontWeight: '900',
+        marginBottom: 5,
+    },
+
+    heroSubtitle: {
+        color: '#CCFBF1',
+        fontSize: 14,
+        fontWeight: '700',
+        marginBottom: 12,
+    },
+
+    heroText: {
+        color: '#E6FFFB',
+        fontSize: 13,
+        lineHeight: 20,
+        marginBottom: 20,
+    },
+
+    heroButtons: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+
+    primaryBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: COLORS.accent,
+        paddingVertical: 13,
+        borderRadius: 13,
+        gap: 7,
+    },
+
+    primaryBtnText: {
+        color: COLORS.card,
+        fontSize: 14,
+        fontWeight: '900',
+    },
+
+    secondaryBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: COLORS.card,
+        paddingVertical: 13,
+        borderRadius: 13,
+        gap: 7,
+    },
+
+    secondaryBtnText: {
+        color: COLORS.primary,
+        fontSize: 14,
+        fontWeight: '900',
+    },
+
+    /* =========================
+       GRID
+    ========================= */
+
+    grid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+    },
+
+    actionCard: {
+        width: '48%',
+        backgroundColor: COLORS.card,
+        padding: 16,
+        borderRadius: 18,
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        elevation: 2,
+        shadowColor: '#0F172A',
+        shadowOpacity: 0.05,
+        shadowRadius: 7,
+        shadowOffset: {
+            width: 0,
+            height: 3,
+        },
+    },
+
+    actionIconContainer: {
+        width: 44,
+        height: 44,
+        borderRadius: 13,
+        backgroundColor: '#CCFBF1',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 11,
+    },
+
+    actionText: {
+        color: COLORS.text,
+        fontSize: 15,
+        fontWeight: '900',
+        marginBottom: 4,
+    },
+
+    actionSubtitle: {
+        color: COLORS.muted,
+        fontSize: 11,
+        lineHeight: 16,
+    },
+
+    /* =========================
+       SECTION
+    ========================= */
+
+    section: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 7,
+        marginBottom: 13,
+    },
+
+    sectionTitle: {
+        color: COLORS.text,
+        fontSize: 20,
+        fontWeight: '900',
+    },
+
+    sectionAction: {
+        color: COLORS.primary,
+        fontSize: 13,
+        fontWeight: '900',
+    },
+
+    /* =========================
+       HORIZONTAL LIST
+    ========================= */
+
+    horizontalList: {
+        paddingBottom: 5,
+    },
+
+    identifyCard: {
+        width: 175,
+        backgroundColor: COLORS.card,
+        padding: 11,
+        borderRadius: 18,
+        marginRight: 13,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        elevation: 2,
+    },
+
+    identifyImage: {
+        width: '100%',
+        height: 125,
+        borderRadius: 13,
+        marginBottom: 10,
+        backgroundColor: '#E2E8F0',
+    },
+
+    identifyName: {
+        color: COLORS.text,
+        fontSize: 14,
+        fontWeight: '900',
+        marginBottom: 3,
+    },
+
+    identifyScientific: {
+        color: COLORS.muted,
+        fontSize: 11,
+        fontStyle: 'italic',
+        marginBottom: 9,
+    },
+
+    confidenceBadge: {
+        alignSelf: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#DCFCE7',
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 20,
+        gap: 4,
+    },
+
+    confidenceText: {
+        color: '#15803D',
+        fontSize: 10,
+        fontWeight: '900',
+    },
+
+    /* =========================
+       STATISTICS
+    ========================= */
+
+    statsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
+
+    statCard: {
+        width: '31.5%',
+        backgroundColor: COLORS.card,
+        paddingVertical: 15,
+        alignItems: 'center',
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        elevation: 2,
+    },
+
+    statIcon: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        backgroundColor: '#CCFBF1',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 7,
+    },
+
+    statNumber: {
+        color: COLORS.primary,
+        fontSize: 21,
+        fontWeight: '900',
+    },
+
+    statLabel: {
+        color: COLORS.muted,
+        fontSize: 11,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+
+    /* =========================
+       INFO CARD
+    ========================= */
+
+    infoCard: {
+        backgroundColor: COLORS.card,
+        padding: 18,
+        borderRadius: 20,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderLeftWidth: 4,
+        borderLeftColor: COLORS.secondary,
+        elevation: 2,
+    },
+
+    infoHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 13,
+    },
+
+    infoIcon: {
+        width: 42,
+        height: 42,
+        borderRadius: 13,
+        backgroundColor: '#CCFBF1',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 11,
+    },
+
+    infoHeaderText: {
+        flex: 1,
+    },
+
+    objectName: {
+        color: COLORS.text,
+        fontSize: 17,
+        fontWeight: '900',
+        marginBottom: 3,
+    },
+
+    scientificName: {
+        color: COLORS.primary,
+        fontSize: 12,
+        fontStyle: 'italic',
+        fontWeight: '700',
+    },
+
+    infoText: {
+        color: COLORS.muted,
+        fontSize: 13,
+        lineHeight: 20,
+        marginBottom: 16,
+    },
+
+    /* =========================
+       BIODIVERSITY
+    ========================= */
+
+    bioGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        borderTopWidth: 1,
+        borderTopColor: '#E2E8F0',
+        paddingTop: 14,
+    },
+
+    bioItem: {
+        width: '50%',
+        marginBottom: 12,
+    },
+
+    bioLabel: {
+        color: COLORS.muted,
+        fontSize: 10,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        marginBottom: 3,
+    },
+
+    bioValue: {
+        color: COLORS.text,
+        fontSize: 13,
+        fontWeight: '800',
+    },
 });
