@@ -416,3 +416,208 @@ exports.changePassword = async (req, res) => {
         });
     }
 };
+
+// GOOGLE AUTHENTICATION
+exports.googleLogin = async (req, res) => {
+    try {
+        const { idToken, email, name, accessToken } = req.body;
+
+        if (!idToken && !email && !accessToken) {
+            return res.status(400).json({
+                msg: 'Google ID token, access token, or email is required'
+            });
+        }
+
+        let verifiedEmail = email;
+        let verifiedName = name;
+
+        // Verify with Google tokeninfo endpoint if idToken is supplied
+        if (idToken) {
+            try {
+                const googleRes = await fetch(
+                    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`
+                );
+                if (googleRes.ok) {
+                    const data = await googleRes.json();
+                    if (data.email) {
+                        verifiedEmail = data.email;
+                        verifiedName = data.name || verifiedName;
+                    }
+                }
+            } catch (err) {
+                console.warn('Google token verification fallback:', err.message);
+            }
+        } else if (accessToken) {
+            try {
+                const userinfoRes = await fetch(
+                    'https://www.googleapis.com/oauth2/v3/userinfo',
+                    {
+                        headers: { Authorization: `Bearer ${accessToken}` }
+                    }
+                );
+                if (userinfoRes.ok) {
+                    const data = await userinfoRes.json();
+                    if (data.email) {
+                        verifiedEmail = data.email;
+                        verifiedName = data.name || verifiedName;
+                    }
+                }
+            } catch (err) {
+                console.warn('Google userinfo fetch fallback:', err.message);
+            }
+        }
+
+        const normalizedEmail = normalizeEmail(verifiedEmail);
+        if (!normalizedEmail) {
+            return res.status(400).json({
+                msg: 'A valid email is required from the Google account'
+            });
+        }
+
+        // Check if user already exists
+        const { data: existingUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', normalizedEmail)
+            .single();
+
+        let user = existingUser;
+
+        if (!user) {
+            // Auto-create user
+            const randomPassword = Math.random().toString(36).slice(-12) + Date.now();
+            const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+            const { data: newUser, error } = await supabase
+                .from('users')
+                .insert([
+                    {
+                        name: verifiedName || normalizedEmail.split('@')[0],
+                        email: normalizedEmail,
+                        phone: null,
+                        password: hashedPassword,
+                        role: 'user'
+                    }
+                ])
+                .select()
+                .single();
+
+            if (error) throw error;
+            user = newUser;
+        }
+
+        const token = jwt.sign(
+            {
+                id: user.id,
+                role: user.role
+            },
+            process.env.JWT_SECRET,
+            {
+                expiresIn: '1d'
+            }
+        );
+
+        res.status(200).json({
+            msg: 'Google login successful',
+            token,
+            user: formatUser(user)
+        });
+    } catch (error) {
+        console.error('Google auth error:', error);
+        res.status(500).json({
+            msg: error.message || 'Google authentication failed'
+        });
+    }
+};
+
+// APPLE AUTHENTICATION
+exports.appleLogin = async (req, res) => {
+    try {
+        const { identityToken, email, fullName, user: appleUserId } = req.body;
+
+        if (!identityToken && !email) {
+            return res.status(400).json({
+                msg: 'Apple identity token or email is required'
+            });
+        }
+
+        let userEmail = email;
+        let userName = fullName
+            ? `${fullName.givenName || ''} ${fullName.familyName || ''}`.trim()
+            : '';
+
+        // Decode JWT payload if identityToken is present
+        if (identityToken) {
+            try {
+                const decoded = jwt.decode(identityToken);
+                if (decoded && decoded.email) {
+                    userEmail = decoded.email;
+                }
+            } catch (err) {
+                console.warn('Apple token decode warning:', err.message);
+            }
+        }
+
+        // Fallback user identifier if email is hidden by Apple Private Relay
+        const normalizedEmail = normalizeEmail(userEmail) || (appleUserId ? `apple_${appleUserId}@wildlens.ai` : null);
+
+        if (!normalizedEmail) {
+            return res.status(400).json({
+                msg: 'Email or Apple user ID is required'
+            });
+        }
+
+        // Check if user already exists
+        const { data: existingUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', normalizedEmail)
+            .single();
+
+        let user = existingUser;
+
+        if (!user) {
+            const randomPassword = Math.random().toString(36).slice(-12) + Date.now();
+            const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+            const { data: newUser, error } = await supabase
+                .from('users')
+                .insert([
+                    {
+                        name: userName || 'Apple User',
+                        email: normalizedEmail,
+                        phone: null,
+                        password: hashedPassword,
+                        role: 'user'
+                    }
+                ])
+                .select()
+                .single();
+
+            if (error) throw error;
+            user = newUser;
+        }
+
+        const token = jwt.sign(
+            {
+                id: user.id,
+                role: user.role
+            },
+            process.env.JWT_SECRET,
+            {
+                expiresIn: '1d'
+            }
+        );
+
+        res.status(200).json({
+            msg: 'Apple login successful',
+            token,
+            user: formatUser(user)
+        });
+    } catch (error) {
+        console.error('Apple auth error:', error);
+        res.status(500).json({
+            msg: error.message || 'Apple authentication failed'
+        });
+    }
+};
