@@ -13,10 +13,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import * as AppleAuthentication from 'expo-apple-authentication';
+
+WebBrowser.maybeCompleteAuthSession();
 
 import API from '../src/services/api';
 
@@ -30,6 +35,36 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [socialLoading, setSocialLoading] = useState(null);
+
+    const [googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
+        webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+        iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+        androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+        clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || 'wildlens-google-client'
+    });
+
+    useEffect(() => {
+        if (googleResponse?.type === 'success') {
+            const { id_token, access_token, authentication } = googleResponse.params || {};
+            const idToken = id_token || authentication?.idToken;
+            const accessToken = access_token || authentication?.accessToken;
+
+            if (idToken || accessToken) {
+                handleGoogleBackendLogin(idToken, accessToken);
+            } else {
+                setSocialLoading(null);
+            }
+        } else if (googleResponse?.type === 'error') {
+            setSocialLoading(null);
+            Alert.alert(
+                'Google Sign-In Error',
+                googleResponse.error?.message || 'Authentication with Google failed.'
+            );
+        } else if (googleResponse?.type === 'dismiss') {
+            setSocialLoading(null);
+        }
+    }, [googleResponse]);
 
     const handleIdentifierChange = (value) => {
         /*
@@ -121,6 +156,126 @@ export default function LoginPage() {
             Alert.alert('Unable to log in', message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleGoogleBackendLogin = async (idToken, accessToken) => {
+        try {
+            setSocialLoading('google');
+            const response = await API.post('/auth/google', {
+                idToken,
+                accessToken
+            });
+
+            const { token, user } = response.data;
+            if (!token || !user) {
+                throw new Error('Invalid response from server');
+            }
+
+            await AsyncStorage.multiSet([
+                ['token', token],
+                ['user', JSON.stringify(user)]
+            ]);
+
+            if (user.role === 'admin') {
+                router.replace('/admin/dashboard');
+            } else {
+                router.replace('/user/dashboard');
+            }
+        } catch (error) {
+            console.error(
+                'Google auth error:',
+                error.response?.data || error.message
+            );
+            const message =
+                error.response?.data?.msg ||
+                error.response?.data?.message ||
+                'Google sign-in failed. Please try again.';
+            Alert.alert('Sign-in error', message);
+        } finally {
+            setSocialLoading(null);
+        }
+    };
+
+    const handleGoogleSignIn = async () => {
+        try {
+            if (
+                !process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID &&
+                !process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID &&
+                !process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID &&
+                !process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
+            ) {
+                Alert.alert(
+                    'Google Sign-In Setup',
+                    'Please configure EXPO_PUBLIC_GOOGLE_CLIENT_ID in mobile/.env with your Google Cloud OAuth Client ID.'
+                );
+            }
+
+            setSocialLoading('google');
+            await promptGoogleAsync();
+        } catch (error) {
+            console.error('Google prompt error:', error);
+            setSocialLoading(null);
+            Alert.alert('Unable to open Google Sign-In', error.message);
+        }
+    };
+
+    const handleAppleSignIn = async () => {
+        try {
+            const isAvailable = await AppleAuthentication.isAvailableAsync();
+            if (!isAvailable) {
+                Alert.alert(
+                    'Apple Sign-In Unavailable',
+                    'Sign in with Apple is available on supported iOS devices.'
+                );
+                return;
+            }
+
+            setSocialLoading('apple');
+            const credential = await AppleAuthentication.signInAsync({
+                requestedScopes: [
+                    AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+                    AppleAuthentication.AppleAuthenticationScope.EMAIL
+                ]
+            });
+
+            const response = await API.post('/auth/apple', {
+                identityToken: credential.identityToken,
+                email: credential.email,
+                fullName: credential.fullName,
+                user: credential.user
+            });
+
+            const { token, user } = response.data;
+            if (!token || !user) {
+                throw new Error('Invalid response from server');
+            }
+
+            await AsyncStorage.multiSet([
+                ['token', token],
+                ['user', JSON.stringify(user)]
+            ]);
+
+            if (user.role === 'admin') {
+                router.replace('/admin/dashboard');
+            } else {
+                router.replace('/user/dashboard');
+            }
+        } catch (error) {
+            if (error.code === 'ERR_REQUEST_CANCELED') {
+                return;
+            }
+            console.error(
+                'Apple auth error:',
+                error.response?.data || error.message
+            );
+            const message =
+                error.response?.data?.msg ||
+                error.response?.data?.message ||
+                'Apple sign-in failed. Please try again.';
+            Alert.alert('Sign-in error', message);
+        } finally {
+            setSocialLoading(null);
         }
     };
 
@@ -310,6 +465,80 @@ export default function LoginPage() {
                                 </View>
                             )}
                         </TouchableOpacity>
+
+                        <View style={styles.dividerContainer}>
+                            <View style={styles.divider} />
+
+                            <Text style={styles.dividerText}>
+                                OR CONTINUE WITH
+                            </Text>
+
+                            <View style={styles.divider} />
+                        </View>
+
+                        <View style={styles.socialButtonsContainer}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.googleButton,
+                                    (loading || !!socialLoading) && styles.disabledButton
+                                ]}
+                                onPress={handleGoogleSignIn}
+                                disabled={loading || !!socialLoading}
+                                activeOpacity={0.8}
+                                accessibilityRole="button"
+                                accessibilityLabel="Sign in with Google"
+                            >
+                                {socialLoading === 'google' ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color="#EA4335"
+                                    />
+                                ) : (
+                                    <>
+                                        <Ionicons
+                                            name="logo-google"
+                                            size={18}
+                                            color="#EA4335"
+                                        />
+
+                                        <Text style={styles.googleButtonText}>
+                                            Google
+                                        </Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.appleButton,
+                                    (loading || !!socialLoading) && styles.disabledButton
+                                ]}
+                                onPress={handleAppleSignIn}
+                                disabled={loading || !!socialLoading}
+                                activeOpacity={0.8}
+                                accessibilityRole="button"
+                                accessibilityLabel="Sign in with Apple"
+                            >
+                                {socialLoading === 'apple' ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color="#FFFFFF"
+                                    />
+                                ) : (
+                                    <>
+                                        <Ionicons
+                                            name="logo-apple"
+                                            size={19}
+                                            color="#FFFFFF"
+                                        />
+
+                                        <Text style={styles.appleButtonText}>
+                                            Apple
+                                        </Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </View>
 
                         <View style={styles.dividerContainer}>
                             <View style={styles.divider} />
@@ -605,6 +834,66 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '800',
         letterSpacing: 0.8
+    },
+
+    socialButtonsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12
+    },
+
+    googleButton: {
+        flex: 1,
+        height: 44,
+        minHeight: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#DDE6E1',
+        borderRadius: 14,
+        shadowColor: '#14392C',
+        shadowOffset: {
+            width: 0,
+            height: 2
+        },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2
+    },
+
+    googleButtonText: {
+        marginLeft: 8,
+        color: '#172A24',
+        fontSize: 14,
+        fontWeight: '700'
+    },
+
+    appleButton: {
+        flex: 1,
+        height: 44,
+        minHeight: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#101715',
+        borderRadius: 14,
+        shadowColor: '#101715',
+        shadowOffset: {
+            width: 0,
+            height: 2
+        },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 3
+    },
+
+    appleButtonText: {
+        marginLeft: 8,
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700'
     },
 
     registerButton: {
